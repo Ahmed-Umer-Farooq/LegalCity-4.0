@@ -85,7 +85,7 @@ const login = async (req, res) => {
       await db('users').where({ id: user.id }).update({ role: 'admin' });
     }
 
-    const token = generateToken(user);
+    const token = generateToken(user, role);
 
     // Prepare user data for redirect logic
     const userData = {

@@ -16,15 +16,22 @@ const authenticateToken = async (req, res, next) => {
 
   // Check if user exists in users or lawyers table
   let user = await db('users').where({ id: decoded.id }).first();
+  let userType = 'user';
+  
   if (!user) {
     user = await db('lawyers').where({ id: decoded.id }).first();
+    userType = 'lawyer';
   }
 
   if (!user) {
     return res.status(403).json({ message: 'User not found' });
   }
 
-  req.user = { ...decoded, isAdmin: user.is_admin || user.role === 'admin' || false };
+  req.user = { 
+    ...decoded, 
+    userType,
+    isAdmin: user.is_admin || user.role === 'admin' || false 
+  };
   next();
 };
 

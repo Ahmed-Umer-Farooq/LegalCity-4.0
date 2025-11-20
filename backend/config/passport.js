@@ -97,7 +97,7 @@ passport.use(
           }
         }
 
-        const token = generateToken(userRecord);
+        const token = generateToken(userRecord, roleToUse);
         console.log(`Google OAuth - Role used: ${roleToUse}, email: ${email}`);
         done(null, { user: userRecord, token, role: roleToUse });
       } catch (error) {
@@ -156,7 +156,7 @@ passport.use(
           }
         }
 
-        const token = generateToken(user);
+        const token = generateToken(user, 'user');
         done(null, { user, token });
       } catch (error) {
         done(error, null);

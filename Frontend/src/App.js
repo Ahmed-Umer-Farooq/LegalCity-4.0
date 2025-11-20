@@ -14,6 +14,7 @@ import SharedLayout from './components/layout/SharedLayout';
 import Blog from './pages/userdashboard/Blog';
 import Messages from './pages/userdashboard/Messages';
 import Directory from './pages/userdashboard/Directory';
+import ChatPage from './pages/userdashboard/ChatPage';
 import Forms from './pages/userdashboard/Forms';
 import SocialMedia from './pages/userdashboard/SocialMedia';
 import Tasks from './pages/userdashboard/Tasks';
@@ -70,6 +71,7 @@ function App() {
         <Route element={<SharedLayout />}>
           <Route path="/blog" element={<Blog />} />
           <Route path="/messages" element={<Messages />} />
+          <Route path="/chat" element={<ChatPage />} />
           <Route path="/directory" element={<Directory />} />
           <Route path="/forms" element={<Forms />} />
           <Route path="/social-media" element={<SocialMedia />} />

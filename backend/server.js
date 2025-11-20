@@ -1,12 +1,25 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
 const cors = require('cors');
 const session = require('express-session');
 const passport = require('./config/passport');
 const authRoutes = require('./routes/auth');
+const db = require('./db');
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5001;
+
+// Socket.io setup with CORS
+const io = socketIo(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
 // Middleware
 app.use(cors({
@@ -75,10 +88,95 @@ const callsRoutes = require('./routes/calls');
 app.use('/api/calls', callsRoutes);
 const messagesRoutes = require('./routes/messages');
 app.use('/api/messages', messagesRoutes);
+const chatRoutes = require('./routes/chatRoutes');
+app.use('/api/chat', chatRoutes);
 const paymentsRoutes = require('./routes/payments');
 app.use('/api/payments', paymentsRoutes);
 const intakesRoutes = require('./routes/intakes');
 app.use('/api/intakes', intakesRoutes);
+
+// Store active users
+const activeUsers = new Map();
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  console.log('New client connected:', socket.id);
+
+  socket.on('user_connected', (userId) => {
+    activeUsers.set(userId, socket.id);
+    console.log(`User ${userId} connected with socket ${socket.id}`);
+    io.emit('user_status', { userId, status: 'online' });
+  });
+
+  socket.on('send_message', async (data) => {
+    try {
+      const { sender_id, sender_type, receiver_id, receiver_type, content } = data;
+      
+      const [messageId] = await db('chat_messages').insert({
+        sender_id,
+        sender_type,
+        receiver_id,
+        receiver_type,
+        content,
+        read_status: false,
+        created_at: new Date()
+      });
+
+      const message = await db('chat_messages').where('id', messageId).first();
+      const receiverSocketId = activeUsers.get(receiver_id);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit('receive_message', message);
+      }
+      socket.emit('message_sent', message);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      socket.emit('message_error', { error: 'Failed to send message' });
+    }
+  });
+
+  socket.on('mark_as_read', async (data) => {
+    try {
+      const { messageIds } = data;
+      await db('chat_messages').whereIn('id', messageIds).update({ read_status: true });
+      socket.emit('messages_marked_read', { messageIds });
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
+  });
+
+  socket.on('typing', (data) => {
+    const { receiver_id } = data;
+    const receiverSocketId = activeUsers.get(receiver_id);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('user_typing', {
+        sender_id: data.sender_id,
+        isTyping: true
+      });
+    }
+  });
+
+  socket.on('stop_typing', (data) => {
+    const { receiver_id } = data;
+    const receiverSocketId = activeUsers.get(receiver_id);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('user_typing', {
+        sender_id: data.sender_id,
+        isTyping: false
+      });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    for (let [userId, socketId] of activeUsers.entries()) {
+      if (socketId === socket.id) {
+        activeUsers.delete(userId);
+        io.emit('user_status', { userId, status: 'offline' });
+        console.log(`User ${userId} disconnected`);
+        break;
+      }
+    }
+  });
+});
 
 // Health check
 app.get('/health', (req, res) => {
@@ -96,7 +194,7 @@ app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 
   // Verify email transporter connection

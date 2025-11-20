@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Menu, Search } from 'lucide-react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 // Sidebar Component
 const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
@@ -242,8 +243,16 @@ const Footer = ({ sidebarWidth = 0 }) => {
 const SharedLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
   
   const sidebarWidth = sidebarCollapsed ? 64 : 256;
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
 
   return (
     <div className="min-h-screen bg-[#F1F9FF]">
